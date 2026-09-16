@@ -38,17 +38,17 @@ const seedAdmin = async () => {
     const adminExists = await User.findOne({ role: 'admin' });
     if (!adminExists) {
       const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash('admin123', salt);
+      const hashedPassword = await bcrypt.hash('Eshan@9726', salt);
 
       await User.create({
-        firstName: 'admin',
+        firstName: 'Eshan',
         lastName: 'System',
         idNumber: 'ADMIN001',
-        studentId: 'admin',
+        studentId: 'Eshan',
         password: hashedPassword,
         role: 'admin'
       });
-      console.log('[Admin Account Seeded]: Username: admin | Password: admin123');
+      console.log('[Admin Account Seeded]: Username: Eshan | Password: Eshan@9726');
     }
   } catch (error) {
     console.error('Notice: Admin seeder pending DB connection...');
