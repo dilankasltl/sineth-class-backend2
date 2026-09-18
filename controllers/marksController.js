@@ -470,6 +470,129 @@ const getStudentPerformance = async (req, res) => {
   }
 };
 
+// @desc    Get Batch Top Performers (Highest Average Score per Batch)
+// @route   GET /api/marks/batch-toppers
+// @access  Private
+const getBatchToppers = async (req, res) => {
+  try {
+    const { alYear } = req.query;
+
+    let examQuery = {};
+    if (alYear && alYear !== 'all') {
+      const yearNum = parseInt(alYear);
+      examQuery = { $or: [{ alYear: yearNum }, { alYear: String(alYear) }] };
+    }
+
+    // 1. Fetch exams for the requested batch (or all exams)
+    const matchingExams = await Exam.find(examQuery);
+    const examIds = matchingExams.map((e) => e._id);
+
+    // 2. Fetch marks for these exams
+    const markQuery = examIds.length > 0 ? { examId: { $in: examIds } } : {};
+    const batchMarks = await Mark.find(markQuery)
+      .populate('studentObjId', 'firstName lastName studentId school alYear idNumber')
+      .populate('examId', 'examName subjectType alYear maxMarks');
+
+    // 3. Map student scores
+    const studentMap = {};
+
+    for (const m of batchMarks) {
+      const sId = m.studentId;
+      let batchYear = m.alYear || (m.examId && m.examId.alYear) || (m.studentObjId && m.studentObjId.alYear);
+      if (!batchYear && sId && sId.length >= 4) {
+        batchYear = sId.substring(0, 4);
+      }
+      batchYear = batchYear ? String(batchYear).trim() : 'Other';
+
+      if (!studentMap[sId]) {
+        let firstName = 'Student';
+        let lastName = '';
+        let school = 'N/A';
+        if (m.studentObjId) {
+          firstName = m.studentObjId.firstName || 'Student';
+          lastName = m.studentObjId.lastName || '';
+          school = m.studentObjId.school || 'N/A';
+        } else {
+          const userDoc = await User.findOne({ studentId: sId });
+          if (userDoc) {
+            firstName = userDoc.firstName;
+            lastName = userDoc.lastName;
+            school = userDoc.school || 'N/A';
+          }
+        }
+
+        studentMap[sId] = {
+          student: {
+            studentId: sId,
+            firstName,
+            lastName,
+            school,
+            alYear: batchYear
+          },
+          totalMarks: 0,
+          examsTaken: 0,
+          highestMark: 0
+        };
+      }
+
+      const score = Number(m.marks) || 0;
+      studentMap[sId].totalMarks += score;
+      studentMap[sId].examsTaken += 1;
+      if (score > studentMap[sId].highestMark) {
+        studentMap[sId].highestMark = score;
+      }
+    }
+
+    // 4. Group by batch year and sort descending
+    const toppersByBatch = {};
+
+    Object.values(studentMap).forEach((item) => {
+      if (item.examsTaken > 0) {
+        let year = item.student.alYear ? String(item.student.alYear).trim() : '';
+        if (!year && item.student.studentId && item.student.studentId.length >= 4) {
+          year = item.student.studentId.substring(0, 4);
+        }
+        if (!year) year = 'Other';
+
+        if (!toppersByBatch[year]) {
+          toppersByBatch[year] = [];
+        }
+
+        const overallAverage = Math.round(item.totalMarks / item.examsTaken);
+        toppersByBatch[year].push({
+          student: { ...item.student, alYear: year },
+          examsTaken: item.examsTaken,
+          overallAverage,
+          highestMark: item.highestMark
+        });
+      }
+    });
+
+    // Sort each batch list by overallAverage descending
+    Object.keys(toppersByBatch).forEach((year) => {
+      toppersByBatch[year].sort((a, b) => {
+        if (b.overallAverage !== a.overallAverage) {
+          return b.overallAverage - a.overallAverage;
+        }
+        return b.highestMark - a.highestMark;
+      });
+    });
+
+    const targetYearStr = alYear && alYear !== 'all' ? String(alYear).trim() : null;
+    const currentToppers = targetYearStr ? (toppersByBatch[targetYearStr] || []) : [];
+
+    return res.json({
+      alYear: alYear || 'all',
+      totalExamsCount: matchingExams.length,
+      toppers: currentToppers,
+      toppersByBatch
+    });
+  } catch (error) {
+    console.error('Batch toppers error:', error);
+    return res.status(500).json({ message: 'Error calculating batch toppers' });
+  }
+};
+
 module.exports = {
   createExam,
   getExams,
@@ -480,5 +603,7 @@ module.exports = {
   deleteMark,
   getExamMarksForView,
   getGroupedExamMarksForView,
-  getStudentPerformance
+  getStudentPerformance,
+  getBatchToppers
 };
+

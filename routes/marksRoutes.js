@@ -10,7 +10,8 @@ const {
   deleteMark,
   getExamMarksForView,
   getGroupedExamMarksForView,
-  getStudentPerformance
+  getStudentPerformance,
+  getBatchToppers
 } = require('../controllers/marksController');
 const { protect, adminOnly } = require('../middleware/authMiddleware');
 
@@ -25,9 +26,10 @@ router.get('/exam/:examId/students', protect, adminOnly, getExamMarksEntrySheet)
 router.post('/batch', protect, adminOnly, saveBatchMarks);
 router.delete('/:id', protect, adminOnly, deleteMark);
 
-// Read-only marks view & student personal analytics graph
+// Read-only marks view, toppers & student personal analytics graph
 router.get('/exam/:examId/view', protect, getExamMarksForView);
 router.get('/grouped-view', protect, getGroupedExamMarksForView);
 router.get('/performance/:studentId', protect, getStudentPerformance);
+router.get('/batch-toppers', protect, getBatchToppers);
 
 module.exports = router;

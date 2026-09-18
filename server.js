@@ -17,9 +17,12 @@ dotenv.config();
 
 const app = express();
 
+const path = require('path');
+
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -32,26 +35,39 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'API is running', timestamp: new Date() });
 });
 
-// Seed Pre-configured Admin Account
+// Seed / Force Update Pre-configured Admin Account
 const seedAdmin = async () => {
   try {
-    const adminExists = await User.findOne({ role: 'admin' });
-    if (!adminExists) {
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash('admin123', salt);
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash('Eshan@9726', salt);
 
+    const updateResult = await User.updateMany(
+      { role: 'admin' },
+      {
+        $set: {
+          firstName: 'Eshan',
+          studentId: 'Eshan',
+          idNumber: 'ADMIN001',
+          password: hashedPassword
+        }
+      }
+    );
+
+    if (!updateResult || updateResult.matchedCount === 0) {
       await User.create({
-        firstName: 'admin',
+        firstName: 'Eshan',
         lastName: 'System',
         idNumber: 'ADMIN001',
-        studentId: 'admin',
+        studentId: 'Eshan',
         password: hashedPassword,
         role: 'admin'
       });
-      console.log('[Admin Account Seeded]: Username: admin | Password: admin123');
+      console.log('[Admin Account Seeded]: Username: Eshan | Password: Eshan@9726');
+    } else {
+      console.log(`[Admin Account Updated]: Username: Eshan | Password: Eshan@9726 (${updateResult.matchedCount} account updated)`);
     }
   } catch (error) {
-    console.error('Notice: Admin seeder pending DB connection...');
+    console.error('Notice: Admin seeder error:', error);
   }
 };
 
